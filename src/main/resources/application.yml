@@ -2,7 +2,7 @@ apps.manifest: https://dashboard.foreman.mn/api/manifests
 
 upgrade:
   check:
-    frequency: 60000
+    frequency: 900000
 
 spring.main.web-application-type: none
 
