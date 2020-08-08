@@ -9,4 +9,6 @@ spring.main.web-application-type: none
 client:
   id: test-client-id
   apiKey: test-api-key
-agent.home: target/
+agent:
+  home: target
+  dist: ${agent.home}\dist

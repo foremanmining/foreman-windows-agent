@@ -33,7 +33,7 @@ public class UpgradeTask {
             LoggerFactory.getLogger(UpgradeTask.class);
 
     /** Where the agent lives. */
-    private final String agentHome;
+    private final String agentDist;
 
     /** The API key. */
     private final String apiKey;
@@ -57,7 +57,7 @@ public class UpgradeTask {
      * Constructor.
      *
      * @param appsManifest The manifest URL.
-     * @param agentHome    The agent home.
+     * @param agentDist    The agent dist.
      * @param clientId     The client ID.
      * @param apiKey       The API key.
      * @param versions     The installed versions.
@@ -67,14 +67,14 @@ public class UpgradeTask {
     @Autowired
     public UpgradeTask(
             @Value("${apps.manifest}") final String appsManifest,
-            @Value("${agent.home}") final String agentHome,
+            @Value("${agent.dist}") final String agentDist,
             @Value("${client.id}") final String clientId,
             @Value("${client.apiKey}") final String apiKey,
             final Map<String, String> versions,
             final WatchDog watchDog,
             final RestTemplate restTemplate) {
         this.appsManifest = appsManifest;
-        this.agentHome = agentHome;
+        this.agentDist = agentDist;
         this.clientId = clientId;
         this.apiKey = apiKey;
         this.versions = versions;
@@ -195,7 +195,7 @@ public class UpgradeTask {
         if (manifest.conf != null && currentVersion != null && !currentVersion.isEmpty()) {
             final Path oldConfFile =
                     mn.foreman.windowsagent.FileUtils.toFilePath(
-                            this.agentHome,
+                            this.agentDist,
                             manifest,
                             currentVersion,
                             AppFolder.CONF,
@@ -228,14 +228,14 @@ public class UpgradeTask {
             final String oldConf,
             final byte[] zipContents) throws IOException {
         // Save the file to disk
-        final File newZipFile = new File(this.agentHome + File.separator + fileName);
+        final File newZipFile = new File(this.agentDist + File.separator + fileName);
         LOG.info("Writing release to disk: {}", newZipFile);
         final Path path = Paths.get(newZipFile.toURI());
         Files.write(path, zipContents);
 
         // Delete the old versions
         mn.foreman.windowsagent.FileUtils.forFileIn(
-                this.agentHome,
+                this.agentDist,
                 File::isDirectory,
                 file -> {
                     if (file.getName().contains(manifest.alias)) {
@@ -248,16 +248,16 @@ public class UpgradeTask {
                 });
 
         // Unzip
-        LOG.info("Unzipping {} to {}", newZipFile, this.agentHome);
+        LOG.info("Unzipping {} to {}", newZipFile, this.agentDist);
         final ZipFile zipFile = new ZipFile(newZipFile);
-        zipFile.extractAll(this.agentHome);
+        zipFile.extractAll(this.agentDist);
 
         // Configure
         final AppManifest.Conf conf = manifest.conf;
         if (conf != null) {
             final Path confFile =
                     mn.foreman.windowsagent.FileUtils.toFilePath(
-                            this.agentHome,
+                            this.agentDist,
                             manifest,
                             version,
                             AppFolder.CONF,

@@ -26,6 +26,30 @@
             <directoryMode>755</directoryMode>
             <fileMode>644</fileMode>
         </fileSet>
+        <fileSet>
+            <directory>${project.basedir}/etc</directory>
+            <outputDirectory>etc</outputDirectory>
+            <directoryMode>755</directoryMode>
+            <fileMode>644</fileMode>
+        </fileSet>
+        <fileSet>
+            <directory>.</directory>
+            <outputDirectory>dist</outputDirectory>
+            <excludes>
+                <exclude>*/**</exclude>
+            </excludes>
+            <directoryMode>755</directoryMode>
+            <fileMode>666</fileMode>
+        </fileSet>
+        <fileSet>
+            <directory>.</directory>
+            <outputDirectory>logs</outputDirectory>
+            <excludes>
+                <exclude>*/**</exclude>
+            </excludes>
+            <directoryMode>755</directoryMode>
+            <fileMode>666</fileMode>
+        </fileSet>
     </fileSets>
 
     <dependencySets>

@@ -25,7 +25,7 @@ public class WatchDog {
             LoggerFactory.getLogger(WatchDog.class);
 
     /** The agent's home directory. */
-    private final String agentHome;
+    private final String agentDist;
 
     /** The applications currently being monitored. */
     private final Map<String, App> apps = new ConcurrentHashMap<>();
@@ -40,14 +40,14 @@ public class WatchDog {
     /**
      * Constructor.
      *
-     * @param agentHome       The agent's home directory.
+     * @param agentDist       The agent's dist directory.
      * @param executorService The thread pool.
      */
     @Autowired
     public WatchDog(
-            @Value("${agent.home}") final String agentHome,
+            @Value("${agent.dist}") final String agentDist,
             final ExecutorService executorService) {
-        this.agentHome = agentHome;
+        this.agentDist = agentDist;
         this.executorService = executorService;
     }
 
@@ -70,7 +70,7 @@ public class WatchDog {
                             s -> new AppImpl(
                                     manifest.app,
                                     FileUtils.toFilePath(
-                                            this.agentHome,
+                                            this.agentDist,
                                             manifest,
                                             version,
                                             AppFolder.BIN,

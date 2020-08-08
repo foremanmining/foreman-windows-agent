@@ -91,6 +91,13 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <arguments>
+                        <argument>--agent.dist=target</argument>
+                        <argument>--client.id=1</argument>
+                        <argument>--client.apiKey=cafebabe</argument>
+                    </arguments>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

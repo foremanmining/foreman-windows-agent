@@ -43,4 +43,5 @@ ECHO.
 ECHO Stopping and removing service...
 "%NSSM%" stop Foreman
 "%NSSM%" remove Foreman confirm
+taskkill /im java.exe /f
 pause

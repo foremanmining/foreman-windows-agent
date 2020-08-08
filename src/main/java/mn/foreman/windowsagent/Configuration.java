@@ -64,17 +64,17 @@ public class Configuration {
      * Creates a {@link Map} containing all of the installed application
      * versions.
      *
-     * @param agentHome The home directory.
+     * @param agentDist The dist directory.
      *
      * @return The versions.
      */
     @Bean
     public Map<String, String> versions(
-            @Value("${agent.home}") final String agentHome) {
+            @Value("${agent.dist}") final String agentDist) {
         final Map<String, String> versions = new ConcurrentHashMap<>();
 
         FileUtils.forFileIn(
-                agentHome,
+                agentDist,
                 File::isDirectory,
                 file -> {
                     final String fileName = file.getName();
