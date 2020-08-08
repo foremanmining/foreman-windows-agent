@@ -42,47 +42,43 @@ echo Installing Agent
 echo **************************************
 echo.
 
-for /F "tokens=1* delims==" %%A in (%AGENT_HOME%\conf\foreman.txt) do (
+for /F "tokens=1* delims==" %%A in ('type "%AGENT_HOME%\conf\foreman.txt"') do (
     if "%%A" == "clientId" set "CLIENT_ID=%%B"
     if "%%A" == "apiKey" set "API_KEY=%%B"
 )
 
 If NOT "%CLIENT_ID%"=="%CLIENT_ID:replace_me=%" (
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
+    echo **************************************
+    echo **************************************
+    echo **************************************
     echo.
     echo Missing 'clientId' in foreman.txt
     echo.
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
+    echo **************************************
+    echo **************************************
+    echo **************************************
     echo.
     goto done
 )
 If NOT "%API_KEY%"=="%API_KEY:replace_me=%" (
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
+    echo **************************************
+    echo **************************************
+    echo **************************************
     echo.
     echo Missing 'apiKey' in foreman.txt
     echo.
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
-    echo ERROR ERROR ERROR
+    echo **************************************
+    echo **************************************
+    echo **************************************
     echo.
     goto done
 )
 
 echo Installing and starting service...
-%NSSM% install Foreman "%AGENT_HOME%\bin\agent.bat" "\"--agent.home=%AGENT_HOME%\" --client.id=%CLIENT_ID% --client.apiKey=%API_KEY%"
-%NSSM% set Foreman Description "The Foreman agent"
-%NSSM% set Foreman Start SERVICE_AUTO_START
-%NSSM% start Foreman
+"%NSSM%" install Foreman "%AGENT_HOME%\bin\agent.bat" "\"--agent.home=%AGENT_HOME%\" --client.id=%CLIENT_ID% --client.apiKey=%API_KEY%"
+"%NSSM%" set Foreman Description "The Foreman agent"
+"%NSSM%" set Foreman Start SERVICE_AUTO_START
+"%NSSM%" start Foreman
 
 :done
 pause

@@ -41,6 +41,6 @@ ECHO Stopping Agent
 ECHO **************************************
 ECHO.
 ECHO Stopping and removing service...
-%NSSM% stop Foreman
-%NSSM% remove Foreman confirm
+"%NSSM%" stop Foreman
+"%NSSM%" remove Foreman confirm
 pause
