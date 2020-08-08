@@ -1,0 +1,12 @@
+apps.manifest: https://dashboard.foreman.mn/api/manifests
+
+upgrade:
+  check:
+    frequency: 60000
+
+spring.main.web-application-type: none
+
+client:
+  id: test-client-id
+  apiKey: test-api-key
+agent.home: target/
