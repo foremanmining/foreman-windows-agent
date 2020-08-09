@@ -75,7 +75,7 @@ If NOT "%API_KEY%"=="%API_KEY:replace_me=%" (
 )
 
 echo Installing and starting service...
-"%NSSM%" install Foreman "%AGENT_HOME%\bin\agent.bat" "\"--agent.home=%AGENT_HOME%\" --client.id=%CLIENT_ID% --client.apiKey=%API_KEY%"
+"%NSSM%" install Foreman "%AGENT_HOME%\bin\agent.bat"
 "%NSSM%" set Foreman Description "The Foreman agent"
 "%NSSM%" set Foreman Start SERVICE_AUTO_START
 "%NSSM%" start Foreman
