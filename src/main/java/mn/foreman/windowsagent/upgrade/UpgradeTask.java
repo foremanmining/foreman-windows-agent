@@ -183,27 +183,30 @@ public class UpgradeTask {
      * @param currentVersion The current version.
      *
      * @return The configuration.
-     *
-     * @throws IOException on failure to read.
      */
     private String readConf(
             final AppManifest manifest,
-            final String currentVersion)
-            throws IOException {
+            final String currentVersion) {
         String conf = null;
 
-        if (manifest.conf != null && currentVersion != null && !currentVersion.isEmpty()) {
-            final Path oldConfFile =
-                    mn.foreman.windowsagent.FileUtils.toFilePath(
-                            this.agentDist,
-                            manifest,
-                            currentVersion,
-                            AppFolder.CONF,
-                            manifest.conf.file);
-            conf =
-                    new String(
-                            Files.readAllBytes(
-                                    oldConfFile));
+        try {
+            if (manifest.conf != null && currentVersion != null && !currentVersion.isEmpty()) {
+                final Path oldConfFile =
+                        mn.foreman.windowsagent.FileUtils.toFilePath(
+                                this.agentDist,
+                                manifest,
+                                currentVersion,
+                                AppFolder.CONF,
+                                manifest.conf.file);
+                conf =
+                        new String(
+                                Files.readAllBytes(
+                                        oldConfFile));
+            }
+        } catch (final Exception e) {
+            LOG.warn("Failed to read previous conf file for {}",
+                    manifest,
+                    currentVersion);
         }
 
         return conf;
