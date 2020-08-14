@@ -120,6 +120,20 @@ public class UpgradeTask {
     }
 
     /**
+     * Checks to see if the provided pattern is present in the file.
+     *
+     * @param pattern The pattern.
+     * @param conf    The conf contents.
+     *
+     * @return Whether or not the pattern is present.
+     */
+    private static boolean patternIsPresent(
+            final String pattern,
+            final String conf) {
+        return (pattern != null && !pattern.isEmpty() && conf.contains(pattern));
+    }
+
+    /**
      * Checks to see if, based on the current version of the application
      * installed, an upgrade is needed.
      *
@@ -148,7 +162,7 @@ public class UpgradeTask {
                 this.versions.get(manifest.alias);
         final String latestVersion =
                 manifest.version;
-        if (shouldUpgrade(currentVersion, latestVersion)) {
+        if (shouldUpgrade(currentVersion, latestVersion) || confIsBad(manifest, currentVersion)) {
             upgrade(
                     manifest,
                     currentVersion);
@@ -160,6 +174,26 @@ public class UpgradeTask {
         this.watchDog.startApp(
                 manifest,
                 this.versions.get(manifest.alias));
+    }
+
+    /**
+     * Checks to see if the conf file looks invalid.
+     *
+     * @param manifest The manifest.
+     * @param version  The current version.
+     *
+     * @return Whether or not the conf file looks invalid.
+     */
+    private boolean confIsBad(
+            final AppManifest manifest,
+            final String version) {
+        final String confContents =
+                readConf(
+                        manifest,
+                        version);
+        final AppManifest.Conf manifestConf = manifest.conf;
+        return patternIsPresent(manifestConf.apiKeyPattern, confContents) ||
+                patternIsPresent(manifestConf.clientIdPattern, confContents);
     }
 
     /**
@@ -234,6 +268,7 @@ public class UpgradeTask {
         final File newZipFile = new File(this.agentDist + File.separator + fileName);
         LOG.info("Writing release to disk: {}", newZipFile);
         final Path path = Paths.get(newZipFile.toURI());
+        Files.deleteIfExists(path);
         Files.write(path, zipContents);
 
         // Delete the old versions
