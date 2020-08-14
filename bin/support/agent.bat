@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 setlocal
 
-set "AGENT_HOME=%~dp0.."
+set "AGENT_HOME=%~dp0..\.."
 set "JAVA_HOME=%AGENT_HOME%\bin\support\win64\jdk-11.0.8+10-jre"
 set "JAVA=%JAVA_HOME%\bin\java.exe"
 

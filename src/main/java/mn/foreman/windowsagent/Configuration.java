@@ -78,7 +78,7 @@ public class Configuration {
                 File::isDirectory,
                 file -> {
                     final String fileName = file.getName();
-                    if (fileName.contains("foreman")) {
+                    if (isForeman(fileName)) {
                         final String[] regions = fileName.split("-");
                         if (regions.length == 3) {
                             versions.put(
@@ -91,5 +91,18 @@ public class Configuration {
         LOG.info("Currently installed versions: {}", versions);
 
         return versions;
+    }
+
+    /**
+     * Returns whether or not the provided folder name is a Foreman release.
+     *
+     * @param fileName The file name.
+     *
+     * @return Whether or not the provided folder name is a Foreman folder.
+     */
+    private static boolean isForeman(final String fileName) {
+        return fileName.contains("foreman") ||
+                // Could be upgrading self
+                fileName.contains("windows-agent");
     }
 }

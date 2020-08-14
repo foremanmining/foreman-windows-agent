@@ -75,10 +75,22 @@ If NOT "%API_KEY%"=="%API_KEY:replace_me=%" (
 )
 
 echo Installing and starting service...
-"%NSSM%" install Foreman "%AGENT_HOME%\bin\agent.bat"
-"%NSSM%" set Foreman Description "The Foreman agent"
-"%NSSM%" set Foreman Start SERVICE_AUTO_START
-"%NSSM%" start Foreman
+
+:: Remove old Pickaxe service
+"%NSSM%" stop Pickaxe >nul 2>&1
+"%NSSM%" remove Pickaxe confirm >nul 2>&1
+
+:: Just in case the user is installing the service again
+"%NSSM%" stop Foreman >nul 2>&1
+"%NSSM%" remove Foreman confirm >nul 2>&1
+taskkill /im java.exe /f >nul 2>&1
+
+"%NSSM%" install Foreman "%AGENT_HOME%\bin\support\agent.bat" >nul 2>&1
+"%NSSM%" set Foreman Description "The Foreman agent" >nul 2>&1
+"%NSSM%" set Foreman Start SERVICE_AUTO_START >nul 2>&1
+"%NSSM%" start Foreman >nul 2>&1
+echo Foreman is now running
 
 :done
+echo.
 pause

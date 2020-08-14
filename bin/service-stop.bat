@@ -41,7 +41,16 @@ ECHO Stopping Agent
 ECHO **************************************
 ECHO.
 ECHO Stopping and removing service...
-"%NSSM%" stop Foreman
-"%NSSM%" remove Foreman confirm
-taskkill /im java.exe /f
+
+:: Remove old pickaxe service
+"%NSSM%" stop Pickaxe >nul 2>&1
+"%NSSM%" remove Pickaxe confirm >nul 2>&1
+
+:: Remove agent service
+"%NSSM%" stop Foreman >nul 2>&1
+"%NSSM%" remove Foreman confirm >nul 2>&1
+taskkill /im java.exe /f >nul 2>&1
+
+echo Foreman has been stopped
+echo.
 pause

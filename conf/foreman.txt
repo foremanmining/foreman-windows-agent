@@ -1,2 +1,2 @@
-clientId=replace_me_client_id
 apiKey=replace_me_api_key
+clientId=replace_me_client_id
