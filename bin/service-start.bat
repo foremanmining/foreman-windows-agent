@@ -34,7 +34,11 @@ if '%1'=='ELEV' (del "%vbsGetPrivileges%" 1>nul 2>nul  &  shift /1)
 ::::::::::::::::::::::::::::
 
 set "AGENT_HOME=%~dp0.."
-set "NSSM=%AGENT_HOME%\bin\support\win64\nssm.exe"
+if "%PROCESSOR_ARCHITECTURE%" == "AMD64" (
+    set "NSSM=%AGENT_HOME%\bin\support\win64\nssm.exe"
+) else (
+    set "NSSM=%AGENT_HOME%\bin\support\win32\nssm.exe"
+)
 
 echo.
 echo **************************************
