@@ -1,5 +1,6 @@
 package mn.foreman.windowsagent;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,22 +70,39 @@ public class Configuration {
      * @return The versions.
      */
     @Bean
-    public Map<String, String> versions(
+    public Map<String, Map<String, String>> versions(
             @Value("${agent.dist}") final String agentDist) {
-        final Map<String, String> versions = new ConcurrentHashMap<>();
+        final Map<String, Map<String, String>> versions =
+                new ConcurrentHashMap<>();
 
         FileUtils.forFileIn(
                 agentDist,
                 File::isDirectory,
-                file -> {
-                    final String fileName = file.getName();
-                    if (isForeman(fileName)) {
-                        final String[] regions = fileName.split("-");
-                        if (regions.length == 3) {
-                            versions.put(
-                                    regions[0] + "-" + regions[1],
-                                    regions[2]);
-                        }
+                distFile -> {
+                    final String distName = distFile.getName();
+                    if (StringUtils.isNumeric(distName)) {
+                        // Must be a dist scale folder
+                        FileUtils.forFileIn(
+                                agentDist + File.separator + distName,
+                                File::isDirectory,
+                                file -> {
+                                    final String fileName = file.getName();
+                                    if (isForeman(fileName)) {
+                                        final String[] regions = fileName.split("-");
+                                        if (regions.length == 3) {
+                                            final Map<String, String> scaleVersions =
+                                                    versions.computeIfAbsent(
+                                                            distName,
+                                                            s -> new ConcurrentHashMap<>());
+                                            scaleVersions.put(
+                                                    String.format(
+                                                            "%s-%s",
+                                                            regions[0],
+                                                            regions[1]),
+                                                    regions[2]);
+                                        }
+                                    }
+                                });
                     }
                 });
 

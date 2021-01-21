@@ -20,6 +20,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.IntStream;
 
 /**
  * Continuously polls the <code>/api/manifest</code> endpoint, looking for
@@ -47,8 +49,11 @@ public class UpgradeTask {
     /** The template for HTTP operations. */
     private final RestTemplate restTemplate;
 
+    /** The application scale. */
+    private final int scale;
+
     /** The installed versions. */
-    private final Map<String, String> versions;
+    private final Map<String, Map<String, String>> versions;
 
     /** The monitor for starting and stopping apps. */
     private final WatchDog watchDog;
@@ -58,6 +63,7 @@ public class UpgradeTask {
      *
      * @param appsManifest The manifest URL.
      * @param agentDist    The agent dist.
+     * @param scale        The scale.
      * @param clientId     The client ID.
      * @param apiKey       The API key.
      * @param versions     The installed versions.
@@ -68,13 +74,15 @@ public class UpgradeTask {
     public UpgradeTask(
             @Value("${apps.manifest}") final String appsManifest,
             @Value("${agent.dist}") final String agentDist,
+            @Value("${agent.scale}") final int scale,
             @Value("${client.id}") final String clientId,
             @Value("${client.apiKey}") final String apiKey,
-            final Map<String, String> versions,
+            final Map<String, Map<String, String>> versions,
             final WatchDog watchDog,
             final RestTemplate restTemplate) {
         this.appsManifest = appsManifest;
         this.agentDist = agentDist;
+        this.scale = scale;
         this.clientId = clientId;
         this.apiKey = apiKey;
         this.versions = versions;
@@ -93,27 +101,18 @@ public class UpgradeTask {
 
         // Check and upgrade each, as needed
         if (appManifests != null) {
-            final Set<String> extraApps =
-                    new HashSet<>(this.versions.keySet());
-
-            Arrays
-                    .stream(appManifests)
-                    .forEach(manifest -> {
-                        try {
-                            extraApps.remove(manifest.alias);
-                            checkAndUpgrade(manifest);
-                        } catch (final Exception e) {
-                            LOG.warn("Exception occurred", e);
-                        }
+            IntStream
+                    .range(0, this.scale)
+                    .forEach(scale -> {
+                        final String scaleString = Integer.toString(scale);
+                        final String dist = this.agentDist + File.separator + scale;
+                        checkManifest(
+                                appManifests,
+                                dist,
+                                this.versions.computeIfAbsent(
+                                        scaleString,
+                                        s -> new ConcurrentHashMap<>()));
                     });
-
-            extraApps.forEach(app -> {
-                try {
-                    this.watchDog.stopApp(app);
-                } catch (final Exception e) {
-                    LOG.warn("Failed to stop app", e);
-                }
-            });
         } else {
             LOG.warn("Failed to obtain app manifests from {}", this.appsManifest);
         }
@@ -152,43 +151,92 @@ public class UpgradeTask {
      * Checks to see if an upgrade is needed and upgrades, if applicable.
      *
      * @param manifest The manifest.
+     * @param versions The versions.
+     * @param dist     The dist folder.
      *
      * @throws Exception on failure.
      */
     private void checkAndUpgrade(
-            final AppManifest manifest)
+            final AppManifest manifest,
+            final Map<String, String> versions,
+            final String dist)
             throws Exception {
         final String currentVersion =
-                this.versions.get(manifest.alias);
+                versions.get(manifest.alias);
         final String latestVersion =
                 manifest.version;
-        if (shouldUpgrade(currentVersion, latestVersion) || confIsBad(manifest, currentVersion)) {
+        if (shouldUpgrade(currentVersion, latestVersion) || confIsBad(dist, manifest, currentVersion)) {
             upgrade(
                     manifest,
-                    currentVersion);
+                    currentVersion,
+                    versions,
+                    dist);
         } else {
             LOG.info("Already have the latest version");
         }
 
         // Always start the app (could be the first run, or was just upgraded)
         this.watchDog.startApp(
+                dist,
                 manifest,
-                this.versions.get(manifest.alias));
+                versions.get(manifest.alias));
+    }
+
+    /**
+     * Checks the provided manifest installations in the provided dist folder.
+     *
+     * @param appManifests The manifests.
+     * @param dist         The dist.
+     * @param versions     The current versions.
+     */
+    private void checkManifest(
+            final AppManifest[] appManifests,
+            final String dist,
+            final Map<String, String> versions) {
+        final Set<String> extraApps =
+                new HashSet<>(versions.keySet());
+
+        Arrays
+                .stream(appManifests)
+                .forEach(manifest -> {
+                    try {
+                        extraApps.remove(manifest.alias);
+                        checkAndUpgrade(
+                                manifest,
+                                versions,
+                                dist);
+                    } catch (final Exception e) {
+                        LOG.warn("Exception occurred", e);
+                    }
+                });
+
+        extraApps.forEach(app -> {
+            try {
+                this.watchDog.stopApp(
+                        dist,
+                        app);
+            } catch (final Exception e) {
+                LOG.warn("Failed to stop app", e);
+            }
+        });
     }
 
     /**
      * Checks to see if the conf file looks invalid.
      *
+     * @param dist     The dist folder.
      * @param manifest The manifest.
      * @param version  The current version.
      *
      * @return Whether or not the conf file looks invalid.
      */
     private boolean confIsBad(
+            final String dist,
             final AppManifest manifest,
             final String version) {
         final String confContents =
                 readConf(
+                        dist,
                         manifest,
                         version);
         final AppManifest.Conf manifestConf = manifest.conf;
@@ -213,12 +261,14 @@ public class UpgradeTask {
     /**
      * Reads the current configuration.
      *
+     * @param dist           The dist folder.
      * @param manifest       The manifest.
      * @param currentVersion The current version.
      *
      * @return The configuration.
      */
     private String readConf(
+            final String dist,
             final AppManifest manifest,
             final String currentVersion) {
         String conf = null;
@@ -227,7 +277,7 @@ public class UpgradeTask {
             if (manifest.conf != null && currentVersion != null && !currentVersion.isEmpty()) {
                 final Path oldConfFile =
                         mn.foreman.windowsagent.FileUtils.toFilePath(
-                                this.agentDist,
+                                dist,
                                 manifest,
                                 currentVersion,
                                 AppFolder.CONF,
@@ -238,7 +288,7 @@ public class UpgradeTask {
                                         oldConfFile));
             }
         } catch (final Exception e) {
-            LOG.warn("Failed to read previous conf file for {}",
+            LOG.warn("Failed to read previous conf file for {}:{}",
                     manifest,
                     currentVersion);
         }
@@ -250,22 +300,33 @@ public class UpgradeTask {
      * Upgrades the application, using the provided file contents as the zip
      * archive.
      *
+     * @param dist        The dist folder.
      * @param manifest    The manifest.
      * @param fileName    The file name.
      * @param version     The version.
      * @param oldConf     The old conf contents.
      * @param zipContents The contents.
+     * @param versions    The versions.
      *
      * @throws IOException on failure to upgrade.
      */
     private void runUpgrade(
+            final String dist,
             final AppManifest manifest,
             final String fileName,
             final String version,
             final String oldConf,
-            final byte[] zipContents) throws IOException {
+            final byte[] zipContents,
+            final Map<String, String> versions)
+            throws IOException {
         // Save the file to disk
-        final File newZipFile = new File(this.agentDist + File.separator + fileName);
+        final File distDir = new File(dist);
+        if (!distDir.exists()) {
+            final Path distPath = Paths.get(distDir.toURI());
+            Files.createDirectory(distPath);
+        }
+
+        final File newZipFile = new File(dist + File.separator + fileName);
         LOG.info("Writing release to disk: {}", newZipFile);
         final Path path = Paths.get(newZipFile.toURI());
         Files.deleteIfExists(path);
@@ -273,7 +334,7 @@ public class UpgradeTask {
 
         // Delete the old versions
         mn.foreman.windowsagent.FileUtils.forFileIn(
-                this.agentDist,
+                dist,
                 File::isDirectory,
                 file -> {
                     if (file.getName().contains(manifest.alias)) {
@@ -286,16 +347,16 @@ public class UpgradeTask {
                 });
 
         // Unzip
-        LOG.info("Unzipping {} to {}", newZipFile, this.agentDist);
+        LOG.info("Unzipping {} to {}", newZipFile, dist);
         final ZipFile zipFile = new ZipFile(newZipFile);
-        zipFile.extractAll(this.agentDist);
+        zipFile.extractAll(dist);
 
         // Configure
         final AppManifest.Conf conf = manifest.conf;
         if (conf != null) {
             final Path confFile =
                     mn.foreman.windowsagent.FileUtils.toFilePath(
-                            this.agentDist,
+                            dist,
                             manifest,
                             version,
                             AppFolder.CONF,
@@ -325,7 +386,7 @@ public class UpgradeTask {
             LOG.warn("Failed to delete zip: {}", newZipFile);
         }
 
-        this.versions.put(manifest.alias, version);
+        versions.put(manifest.alias, version);
     }
 
     /**
@@ -333,26 +394,36 @@ public class UpgradeTask {
      *
      * @param manifest       The manifest.
      * @param currentVersion The current version that's installed.
+     * @param versions       The versions.
+     * @param dist           The dist folder.
      *
      * @throws Exception on failure to upgrade.
      */
     private void upgrade(
             final AppManifest manifest,
-            final String currentVersion) throws Exception {
+            final String currentVersion,
+            final Map<String, String> versions,
+            final String dist)
+            throws Exception {
         LOG.info("Stopping {}", manifest.app);
-        this.watchDog.stopApp(manifest.alias);
+        this.watchDog.stopApp(
+                dist,
+                manifest.alias);
 
         final Optional<byte[]> newVersionsZip =
                 downloadRelease(manifest.github.zipUrl);
         if (newVersionsZip.isPresent()) {
             runUpgrade(
+                    dist,
                     manifest,
                     manifest.github.name,
                     manifest.version,
                     readConf(
+                            dist,
                             manifest,
                             currentVersion),
-                    newVersionsZip.get());
+                    newVersionsZip.get(),
+                    versions);
         } else {
             LOG.warn("Failed to obtain the release");
         }

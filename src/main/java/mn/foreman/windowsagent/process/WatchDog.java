@@ -7,10 +7,10 @@ import mn.foreman.windowsagent.foreman.AppManifest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -24,11 +24,9 @@ public class WatchDog {
     private static final Logger LOG =
             LoggerFactory.getLogger(WatchDog.class);
 
-    /** The agent's home directory. */
-    private final String agentDist;
-
     /** The applications currently being monitored. */
-    private final Map<String, App> apps = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, App>> apps =
+            new ConcurrentHashMap<>();
 
     /** The thread pool for running apps. */
     private final ExecutorService executorService;
@@ -40,37 +38,40 @@ public class WatchDog {
     /**
      * Constructor.
      *
-     * @param agentDist       The agent's dist directory.
      * @param executorService The thread pool.
      */
     @Autowired
-    public WatchDog(
-            @Value("${agent.dist}") final String agentDist,
-            final ExecutorService executorService) {
-        this.agentDist = agentDist;
+    public WatchDog(final ExecutorService executorService) {
         this.executorService = executorService;
     }
 
     /**
      * Starts the provided application, by name.
      *
+     * @param dist     The dist.
      * @param manifest The manifest.
      * @param version  The version.
      *
      * @throws Exception on failure to start.
      */
     public void startApp(
+            final String dist,
             final AppManifest manifest,
             final String version) throws Exception {
         this.lock.writeLock().lock();
         try {
-            final App app =
+            final Map<String, App> distMap =
                     this.apps.computeIfAbsent(
+                            dist,
+                            s -> new ConcurrentHashMap<>());
+
+            final App app =
+                    distMap.computeIfAbsent(
                             manifest.alias,
                             s -> new AppImpl(
                                     manifest.app,
                                     FileUtils.toFilePath(
-                                            this.agentDist,
+                                            dist,
                                             manifest,
                                             version,
                                             AppFolder.BIN,
@@ -90,17 +91,23 @@ public class WatchDog {
     /**
      * Stops the application with the provided name.
      *
+     * @param dist    The dist.
      * @param appName The application name.
      */
-    public void stopApp(final String appName) {
+    public void stopApp(
+            final String dist,
+            final String appName) {
         this.lock.writeLock().lock();
         try {
-            final App app = this.apps.remove(appName);
-            if (app != null) {
-                LOG.info("Stopping {}", appName);
-                app.stop();
-            } else {
-                LOG.debug("{} isn't running", appName);
+            final Map<String, App> distMap = this.apps.get(dist);
+            if (distMap != null && distMap.containsKey(dist)) {
+                final App app = distMap.remove(appName);
+                if (app != null) {
+                    LOG.info("Stopping {}", appName);
+                    app.stop();
+                } else {
+                    LOG.debug("{} isn't running", appName);
+                }
             }
         } finally {
             this.lock.writeLock().unlock();
@@ -116,6 +123,8 @@ public class WatchDog {
             this.apps
                     .values()
                     .stream()
+                    .map(Map::values)
+                    .flatMap(Collection::stream)
                     .filter(App::isNotRunning)
                     .forEach(app -> {
                         try {

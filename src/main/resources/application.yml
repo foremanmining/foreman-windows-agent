@@ -12,3 +12,4 @@ client:
 agent:
   home: target
   dist: ${agent.home}\dist
+  scale: 1
