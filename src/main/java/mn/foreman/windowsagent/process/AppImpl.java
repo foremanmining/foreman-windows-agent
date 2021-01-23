@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** An {@link App} implementation. */
@@ -92,10 +93,20 @@ public class AppImpl
     public void stop() {
         if (this.running.compareAndSet(true, false)) {
             this.task.cancel(true);
-            this.process
-                    .descendants()
-                    .forEach(ProcessHandle::destroy);
-            this.process.destroy();
+            try {
+                this.process
+                        .descendants()
+                        .forEach(ProcessHandle::destroyForcibly);
+                this.process.destroyForcibly();
+            } catch (final Exception e) {
+                LOG.warn("Exception occurred while destroying process", e);
+            }
+
+            try {
+                TimeUnit.SECONDS.sleep(10);
+            } catch (final InterruptedException e) {
+                // Ignore
+            }
         }
     }
 
