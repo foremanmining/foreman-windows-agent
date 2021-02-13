@@ -100,7 +100,7 @@ public class WatchDog {
         this.lock.writeLock().lock();
         try {
             final Map<String, App> distMap = this.apps.get(dist);
-            if (distMap != null && distMap.containsKey(dist)) {
+            if (distMap != null && distMap.containsKey(appName)) {
                 final App app = distMap.remove(appName);
                 if (app != null) {
                     LOG.info("Stopping {}", appName);
