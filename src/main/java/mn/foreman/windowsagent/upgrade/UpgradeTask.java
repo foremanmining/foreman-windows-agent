@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -101,13 +102,18 @@ public class UpgradeTask {
 
         // Check and upgrade each, as needed
         if (appManifests != null) {
+            final List<AppManifest> windowsApps =
+                    Arrays.stream(appManifests)
+                            .filter(appManifest -> appManifest.windows)
+                            .collect(Collectors.toList());
+
             IntStream
                     .range(0, this.scale)
                     .forEach(scale -> {
                         final String scaleString = Integer.toString(scale);
                         final String dist = this.agentDist + File.separator + scale;
                         checkManifest(
-                                appManifests,
+                                windowsApps,
                                 dist,
                                 this.versions.computeIfAbsent(
                                         scaleString,
@@ -190,25 +196,23 @@ public class UpgradeTask {
      * @param versions     The current versions.
      */
     private void checkManifest(
-            final AppManifest[] appManifests,
+            final List<AppManifest> appManifests,
             final String dist,
             final Map<String, String> versions) {
         final Set<String> extraApps =
                 new HashSet<>(versions.keySet());
 
-        Arrays
-                .stream(appManifests)
-                .forEach(manifest -> {
-                    try {
-                        extraApps.remove(manifest.alias);
-                        checkAndUpgrade(
-                                manifest,
-                                versions,
-                                dist);
-                    } catch (final Exception e) {
-                        LOG.warn("Exception occurred", e);
-                    }
-                });
+        appManifests.forEach(manifest -> {
+            try {
+                extraApps.remove(manifest.alias);
+                checkAndUpgrade(
+                        manifest,
+                        versions,
+                        dist);
+            } catch (final Exception e) {
+                LOG.warn("Exception occurred", e);
+            }
+        });
 
         extraApps.forEach(app -> {
             try {

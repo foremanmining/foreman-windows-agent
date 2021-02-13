@@ -31,6 +31,10 @@ public class AppManifest {
     @JsonProperty("version")
     public String version;
 
+    /** Whether or not the application applies to Windows. */
+    @JsonProperty("windows")
+    public boolean windows;
+
     /** An app's configuration. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Conf {
