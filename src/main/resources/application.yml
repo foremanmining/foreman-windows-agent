@@ -1,4 +1,4 @@
-apps.manifest: https://dashboard.foreman.mn/api/manifests
+apps.manifest: https://api.foreman.mn/api/manifests
 
 upgrade:
   check:
