@@ -1,6 +1,7 @@
 package mn.foreman.windowsagent.upgrade;
 
 import mn.foreman.windowsagent.AppFolder;
+import mn.foreman.windowsagent.VersionFactory;
 import mn.foreman.windowsagent.foreman.AppManifest;
 import mn.foreman.windowsagent.process.WatchDog;
 
@@ -8,10 +9,6 @@ import net.lingala.zip4j.ZipFile;
 import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
@@ -21,14 +18,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Continuously polls the <code>/api/manifest</code> endpoint, looking for
  * applications to install.
  */
-@Component
 public class UpgradeTask {
 
     /** The logger for this class. */
@@ -45,16 +41,16 @@ public class UpgradeTask {
     private final String appsManifest;
 
     /** The client ID. */
-    private final String clientId;
+    private final Function<String, String> clientIdSupplier;
+
+    /** The identifiers. */
+    private final List<Integer> identifiers;
 
     /** The template for HTTP operations. */
     private final RestTemplate restTemplate;
 
-    /** The application scale. */
-    private final int scale;
-
-    /** The installed versions. */
-    private final Map<String, Map<String, String>> versions;
+    /** Obtains the installed versions. */
+    private final VersionFactory versionFactory;
 
     /** The monitor for starting and stopping apps. */
     private final WatchDog watchDog;
@@ -62,43 +58,44 @@ public class UpgradeTask {
     /**
      * Constructor.
      *
-     * @param appsManifest The manifest URL.
-     * @param agentDist    The agent dist.
-     * @param scale        The scale.
-     * @param clientId     The client ID.
-     * @param apiKey       The API key.
-     * @param versions     The installed versions.
-     * @param watchDog     The monitor for starting and stopping apps.
-     * @param restTemplate The template for HTTP operations.
+     * @param appsManifest     The manifest URL.
+     * @param agentDist        The agent dist.
+     * @param identifiers      The identifiers.
+     * @param clientIdSupplier The client ID supplier.
+     * @param apiKey           The API key.
+     * @param versionFactory   Factory for obtaining the installed versions.
+     * @param watchDog         The monitor for starting and stopping apps.
+     * @param restTemplate     The template for HTTP operations.
      */
-    @Autowired
     public UpgradeTask(
-            @Value("${apps.manifest}") final String appsManifest,
-            @Value("${agent.dist}") final String agentDist,
-            @Value("${agent.scale}") final int scale,
-            @Value("${client.id}") final String clientId,
-            @Value("${client.apiKey}") final String apiKey,
-            final Map<String, Map<String, String>> versions,
+            final String appsManifest,
+            final String agentDist,
+            final List<Integer> identifiers,
+            final Function<String, String> clientIdSupplier,
+            final String apiKey,
+            final VersionFactory versionFactory,
             final WatchDog watchDog,
             final RestTemplate restTemplate) {
         this.appsManifest = appsManifest;
         this.agentDist = agentDist;
-        this.scale = scale;
-        this.clientId = clientId;
+        this.identifiers = identifiers;
+        this.clientIdSupplier = clientIdSupplier;
         this.apiKey = apiKey;
-        this.versions = versions;
+        this.versionFactory = versionFactory;
         this.watchDog = watchDog;
         this.restTemplate = restTemplate;
     }
 
     /** Checks for an upgrade. */
-    @Scheduled(fixedRateString = "${upgrade.check.frequency}")
     public void check() {
         // Determine which applications are being auto-upgraded
         final AppManifest[] appManifests =
                 this.restTemplate.getForObject(
                         this.appsManifest,
                         AppManifest[].class);
+
+        final Map<String, Map<String, String>> versions =
+                this.versionFactory.getVersions();
 
         // Check and upgrade each, as needed
         if (appManifests != null) {
@@ -107,16 +104,18 @@ public class UpgradeTask {
                             .filter(appManifest -> appManifest.windows)
                             .collect(Collectors.toList());
 
-            IntStream
-                    .range(0, this.scale)
-                    .forEach(scale -> {
-                        final String scaleString = Integer.toString(scale);
-                        final String dist = this.agentDist + File.separator + scale;
+            this.identifiers
+                    .forEach(identifier -> {
+                        final String identifierString =
+                                Integer.toString(identifier);
+                        final String dist =
+                                this.agentDist + File.separator + identifier;
                         checkManifest(
+                                identifierString,
                                 windowsApps,
                                 dist,
-                                this.versions.computeIfAbsent(
-                                        scaleString,
+                                versions.computeIfAbsent(
+                                        identifierString,
                                         s -> new ConcurrentHashMap<>()));
                     });
         } else {
@@ -156,13 +155,15 @@ public class UpgradeTask {
     /**
      * Checks to see if an upgrade is needed and upgrades, if applicable.
      *
-     * @param manifest The manifest.
-     * @param versions The versions.
-     * @param dist     The dist folder.
+     * @param identifier The identifier.
+     * @param manifest   The manifest.
+     * @param versions   The versions.
+     * @param dist       The dist folder.
      *
      * @throws Exception on failure.
      */
     private void checkAndUpgrade(
+            final String identifier,
             final AppManifest manifest,
             final Map<String, String> versions,
             final String dist)
@@ -173,6 +174,7 @@ public class UpgradeTask {
                 manifest.version;
         if (shouldUpgrade(currentVersion, latestVersion) || confIsBad(dist, manifest, currentVersion)) {
             upgrade(
+                    identifier,
                     manifest,
                     currentVersion,
                     versions,
@@ -191,11 +193,13 @@ public class UpgradeTask {
     /**
      * Checks the provided manifest installations in the provided dist folder.
      *
+     * @param identifier   The identifier.
      * @param appManifests The manifests.
      * @param dist         The dist.
      * @param versions     The current versions.
      */
     private void checkManifest(
+            final String identifier,
             final List<AppManifest> appManifests,
             final String dist,
             final Map<String, String> versions) {
@@ -206,6 +210,7 @@ public class UpgradeTask {
             try {
                 extraApps.remove(manifest.alias);
                 checkAndUpgrade(
+                        identifier,
                         manifest,
                         versions,
                         dist);
@@ -304,6 +309,7 @@ public class UpgradeTask {
      * Upgrades the application, using the provided file contents as the zip
      * archive.
      *
+     * @param identifier  The identifier.
      * @param dist        The dist folder.
      * @param manifest    The manifest.
      * @param fileName    The file name.
@@ -315,6 +321,7 @@ public class UpgradeTask {
      * @throws IOException on failure to upgrade.
      */
     private void runUpgrade(
+            final String identifier,
             final String dist,
             final AppManifest manifest,
             final String fileName,
@@ -379,7 +386,7 @@ public class UpgradeTask {
             confContents =
                     confContents.replace(
                             conf.clientIdPattern,
-                            this.clientId);
+                            this.clientIdSupplier.apply(identifier));
 
             Files.write(
                     confFile,
@@ -396,6 +403,7 @@ public class UpgradeTask {
     /**
      * Performs an upgrade by downloading and unpacking the zip from github.
      *
+     * @param identifier     The identifier.
      * @param manifest       The manifest.
      * @param currentVersion The current version that's installed.
      * @param versions       The versions.
@@ -404,6 +412,7 @@ public class UpgradeTask {
      * @throws Exception on failure to upgrade.
      */
     private void upgrade(
+            final String identifier,
             final AppManifest manifest,
             final String currentVersion,
             final Map<String, String> versions,
@@ -418,6 +427,7 @@ public class UpgradeTask {
                 downloadRelease(manifest.github.zipUrl);
         if (newVersionsZip.isPresent()) {
             runUpgrade(
+                    identifier,
                     dist,
                     manifest,
                     manifest.github.name,

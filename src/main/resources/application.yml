@@ -2,7 +2,7 @@ apps.manifest: https://api.foreman.mn/api/v2/manifests
 
 upgrade:
   check:
-    frequency: 900000
+    frequency: 300000
 
 spring.main.web-application-type: none
 
@@ -11,5 +11,8 @@ client:
   apiKey: test-api-key
 agent:
   home: target
-  dist: ${agent.home}\dist
+  dist: ${agent.home}\dist\private
+  colo:
+    dist: ${agent.home}\dist\colo
+    enabled: false
   scale: 1

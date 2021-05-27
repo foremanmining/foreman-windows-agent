@@ -34,7 +34,16 @@
         </fileSet>
         <fileSet>
             <directory>.</directory>
-            <outputDirectory>dist</outputDirectory>
+            <outputDirectory>dist/private</outputDirectory>
+            <excludes>
+                <exclude>*/**</exclude>
+            </excludes>
+            <directoryMode>755</directoryMode>
+            <fileMode>666</fileMode>
+        </fileSet>
+        <fileSet>
+            <directory>.</directory>
+            <outputDirectory>dist/colo</outputDirectory>
             <excludes>
                 <exclude>*/**</exclude>
             </excludes>

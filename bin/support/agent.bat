@@ -20,6 +20,7 @@ for /F "tokens=1* delims==" %%A in ('type "%AGENT_HOME%\conf\foreman.txt"') do (
     if "%%A" == "clientId" set "CLIENT_ID=%%B"
     if "%%A" == "apiKey" set "API_KEY=%%B"
     if "%%A" == "scale" set "SCALE=%%B"
+    if "%%A" == "colo" set "COLO=%%B"
 )
 If NOT "%CLIENT_ID%"=="%CLIENT_ID:replace_me=%" (
     echo Missing 'clientId' in foreman.txt
@@ -34,6 +35,9 @@ If NOT "%API_KEY%"=="%API_KEY:replace_me=%" (
 If "%SCALE%"=="" (
     set "SCALE=1"
 )
+If "%COLO%"=="" (
+    set "COLO=false"
+)
 
 echo Note: to run in the background, install and start as a service
 echo;
@@ -42,6 +46,6 @@ echo - run 'service-start.bat' to install and auto-start
 echo - run 'service-stop.bat' to stop
 echo;
 echo Starting agent...(leave this window open)
-"%JAVA%" "%JVM_PARAMS%" -jar "%AGENT_HOME%\lib\%JAR%" "--logging.config=%AGENT_HOME%\etc\logback.xml" "--agent.home=%AGENT_HOME%" --client.id=%CLIENT_ID% --client.apiKey=%API_KEY% --agent.scale=%SCALE%
+"%JAVA%" "%JVM_PARAMS%" -jar "%AGENT_HOME%\lib\%JAR%" "--logging.config=%AGENT_HOME%\etc\logback.xml" "--agent.home=%AGENT_HOME%" --client.id=%CLIENT_ID% --client.apiKey=%API_KEY% --agent.scale=%SCALE% --agent.colo.enabled=%COLO%
 
 endlocal
