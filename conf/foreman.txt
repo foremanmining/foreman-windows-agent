@@ -1,2 +1,4 @@
 apiKey=replace_me_api_key
 clientId=replace_me_client_id
+scale=1
+colo=false
