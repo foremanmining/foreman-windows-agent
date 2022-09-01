@@ -88,6 +88,16 @@ public class WatchDog {
         }
     }
 
+    /** Stops the running apps. */
+    public void stopAll() {
+        this.apps
+                .values()
+                .stream()
+                .map(Map::values)
+                .flatMap(Collection::stream)
+                .forEach(App::stop);
+    }
+
     /**
      * Stops the application with the provided name.
      *

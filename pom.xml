@@ -23,23 +23,25 @@
 
     <distributionManagement>
         <repository>
-            <id>central</id>
-            <name>2666cfb367e1-releases</name>
-            <url>https://artifactory.foreman.mn/artifactory/libs-release</url>
+            <id>gcp-releases</id>
+            <url>
+                artifactregistry://us-maven.pkg.dev/foreman-production/releases
+            </url>
         </repository>
         <snapshotRepository>
-            <id>snapshots</id>
-            <name>2666cfb367e1-snapshots</name>
-            <url>https://artifactory.foreman.mn/artifactory/libs-snapshot</url>
+            <id>gcp-snapshots</id>
+            <url>
+                artifactregistry://us-maven.pkg.dev/foreman-production/snapshots
+            </url>
         </snapshotRepository>
     </distributionManagement>
 
     <properties>
         <java.version>11</java.version>
 
-        <foreman.version>1.2.0</foreman.version>
-        <commons-io.version>2.7</commons-io.version>
-        <zip4j.version>2.6.1</zip4j.version>
+        <foreman.version>1.38.0</foreman.version>
+        <commons-io.version>2.11.0</commons-io.version>
+        <zip4j.version>2.11.1</zip4j.version>
     </properties>
 
     <dependencies>

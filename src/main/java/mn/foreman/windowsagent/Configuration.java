@@ -3,8 +3,12 @@ package mn.foreman.windowsagent;
 import mn.foreman.api.ForemanApi;
 import mn.foreman.api.ForemanApiImpl;
 import mn.foreman.api.JdkWebUtil;
+import mn.foreman.windowsagent.process.WatchDog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
@@ -12,11 +16,13 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
 
+import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /** A {@link Configuration} provides a configuration for the windows agent. */
 @org.springframework.context.annotation.Configuration
@@ -25,12 +31,19 @@ public class Configuration {
     /** The base URL. */
     private static final String FOREMAN_BASE_URL;
 
+    private static final Logger LOG =
+            LoggerFactory.getLogger(Configuration.class);
+
     static {
         FOREMAN_BASE_URL =
                 System.getProperty(
                         "FOREMAN_BASE_URL",
                         "https://api.foreman.mn");
     }
+
+    /** The {@link WatchDog}. */
+    @Autowired
+    private WatchDog watchDog;
 
     /**
      * Returns the {@link VersionFactory} for obtaining versions for
@@ -74,7 +87,9 @@ public class Configuration {
                 new ObjectMapper(),
                 new JdkWebUtil(
                         FOREMAN_BASE_URL,
-                        apiKey));
+                        apiKey,
+                        30,
+                        TimeUnit.SECONDS));
     }
 
     /**
@@ -113,5 +128,11 @@ public class Configuration {
         restTemplate.setMessageConverters(messageConverters);
 
         return restTemplate;
+    }
+
+    /** Shutdown hook to terminate all sub-processes. */
+    @PreDestroy
+    public void shutdownHook() {
+        this.watchDog.stopAll();
     }
 }
