@@ -2,6 +2,8 @@ language: java
 jdk:
   - openjdk11
 
+before_install: openssl aes-256-cbc -K $encrypted_a48e15357eff_key -iv $encrypted_a48e15357eff_iv -in foreman-production-dff7d0598319.json.enc -out foreman-production-dff7d0598319.json -d
+
 install: mvn install --settings .travis.settings.xml -DskipTests=true -Dmaven.javadoc.skip=true -B -V -q
 
 script: mvn verify --settings .travis.settings.xml -q
