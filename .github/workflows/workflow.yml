@@ -7,7 +7,7 @@ on:
 
 jobs:
   call-workflow-passing-data:
-    uses: foremanmining/workflows/.github/workflows/java.yml@primary
+    uses: foremanmining/workflows/.github/workflows/java.yml@main
     with:
       result-folder: './'
       gcs-bucket: windows-agent-releases
