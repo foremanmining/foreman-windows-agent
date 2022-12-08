@@ -11,3 +11,4 @@ jobs:
     with:
       result-folder: './'
       gcs-bucket: windows-agent-releases
+    secrets: inherit
