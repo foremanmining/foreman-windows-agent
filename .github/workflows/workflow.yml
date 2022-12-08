@@ -1,0 +1,13 @@
+name: workflow
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  call-workflow-passing-data:
+    uses: foremanmining/workflows/java.yml@workflow
+    with:
+      result-folder: './'
+      gcs-bucket: windows-agent-releases
