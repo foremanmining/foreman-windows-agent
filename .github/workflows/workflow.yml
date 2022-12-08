@@ -11,4 +11,5 @@ jobs:
     with:
       result-folder: './'
       gcs-bucket: windows-agent-releases
+      java: 11
     secrets: inherit
