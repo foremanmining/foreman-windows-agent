@@ -2,7 +2,7 @@
 
 ## Status ##
 
-[![Build Status](https://travis-ci.com/delawr0190/foreman-windows-agent.svg?branch=master)](https://travis-ci.com/delawr0190/foreman-windows-agent)
+![Build Status](https://github.com/foremanmining/foreman-windows-agent/actions/workflows/workflow.yml/badge.svg)
 
 ## Windows Agent ##
 

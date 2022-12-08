@@ -1,0 +1,15 @@
+name: workflow
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  workflow:
+    uses: foremanmining/workflows/.github/workflows/java.yml@main
+    with:
+      result-folder: './'
+      gcs-bucket: windows-agent-releases
+      java: 11
+    secrets: inherit
