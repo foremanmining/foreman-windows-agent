@@ -6,7 +6,7 @@ on:
       - '*'
 
 jobs:
-  call-workflow:
+  workflow:
     uses: foremanmining/workflows/.github/workflows/java.yml@main
     with:
       result-folder: './'
