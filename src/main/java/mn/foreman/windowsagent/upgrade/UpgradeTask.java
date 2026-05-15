@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestTemplate;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -213,7 +214,7 @@ public class UpgradeTask {
             return Optional.empty();
         }
         try (InputStream in = new FileInputStream(ymlFile)) {
-            final Object parsed = new Yaml().load(in);
+            final Object parsed = new Yaml(new SafeConstructor()).load(in);
             if (parsed instanceof Map) {
                 final Object value = ((Map<?, ?>) parsed).get("pickaxeId");
                 if (value != null) {
