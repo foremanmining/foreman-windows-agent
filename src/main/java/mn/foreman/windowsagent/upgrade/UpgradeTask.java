@@ -10,9 +10,15 @@ import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestTemplate;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,6 +36,12 @@ public class UpgradeTask {
     /** The logger for this class. */
     private static final Logger LOG =
             LoggerFactory.getLogger(UpgradeTask.class);
+
+    /** The pickaxe install folder prefix used to locate {@code pickaxe.yml}. */
+    private static final String PICKAXE_FOLDER_PREFIX = "foreman-pickaxe-";
+
+    /** The pickaxe configuration file name. */
+    private static final String PICKAXE_YML = "pickaxe.yml";
 
     /** Where the agent lives. */
     private final String agentDist;
@@ -88,39 +100,134 @@ public class UpgradeTask {
 
     /** Checks for an upgrade. */
     public void check() {
-        // Determine which applications are being auto-upgraded
-        final AppManifest[] appManifests =
-                this.restTemplate.getForObject(
-                        this.appsManifest,
-                        AppManifest[].class);
-
         final Map<String, Map<String, String>> versions =
                 this.versionFactory.getVersions();
 
-        // Check and upgrade each, as needed
-        if (appManifests != null) {
-            final List<AppManifest> windowsApps =
-                    Arrays.stream(appManifests)
-                            .filter(appManifest -> appManifest.windows)
-                            .collect(Collectors.toList());
+        this.identifiers
+                .forEach(identifier -> {
+                    final String identifierString =
+                            Integer.toString(identifier);
+                    final String dist =
+                            this.agentDist + File.separator + identifier;
 
-            this.identifiers
-                    .forEach(identifier -> {
-                        final String identifierString =
-                                Integer.toString(identifier);
-                        final String dist =
-                                this.agentDist + File.separator + identifier;
-                        checkManifest(
-                                identifierString,
-                                windowsApps,
-                                dist,
-                                versions.computeIfAbsent(
-                                        identifierString,
-                                        s -> new ConcurrentHashMap<>()));
-                    });
-        } else {
-            LOG.warn("Failed to obtain app manifests from {}", this.appsManifest);
+                    final String pickaxeKey =
+                            findPickaxeIdInDist(dist).orElse("");
+                    final String url =
+                            buildManifestUrl(this.appsManifest, pickaxeKey);
+
+                    final AppManifest[] appManifests =
+                            this.restTemplate.getForObject(
+                                    url,
+                                    AppManifest[].class);
+                    if (appManifests == null) {
+                        LOG.warn("Failed to obtain app manifests from {}", url);
+                        return;
+                    }
+
+                    final List<AppManifest> windowsApps =
+                            Arrays.stream(appManifests)
+                                    .filter(appManifest -> appManifest.windows)
+                                    .collect(Collectors.toList());
+
+                    checkManifest(
+                            identifierString,
+                            windowsApps,
+                            dist,
+                            versions.computeIfAbsent(
+                                    identifierString,
+                                    s -> new ConcurrentHashMap<>()));
+                });
+    }
+
+    /**
+     * Appends the {@code pickaxe_key} query parameter to the configured
+     * manifest URL, using {@code &} or {@code ?} as appropriate.  When
+     * {@code pickaxeKey} is empty (i.e. no pickaxe is currently installed
+     * for this identifier and so we have no key to send), the base URL is
+     * returned unchanged.
+     *
+     * @param base       The base manifest URL.
+     * @param pickaxeKey The pickaxe key to append (may be empty).
+     *
+     * @return The URL with the pickaxe key embedded as a query parameter,
+     *         or the base URL unchanged when no key is available.
+     */
+    private static String buildManifestUrl(
+            final String base,
+            final String pickaxeKey) {
+        if (pickaxeKey.isEmpty()) {
+            return base;
         }
+        final String separator = base.contains("?") ? "&" : "?";
+        return base
+                + separator
+                + "pickaxe_key="
+                + URLEncoder.encode(pickaxeKey, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Searches for an installed pickaxe inside the provided per-identifier
+     * dist folder and, if found, extracts the {@code pickaxeId} value from
+     * its {@code conf/pickaxe.yml}.
+     *
+     * @param dist The per-identifier dist folder
+     *             (e.g. {@code <agentDist>/<identifier>}).
+     *
+     * @return The pickaxe ID, if one could be resolved.
+     */
+    private static Optional<String> findPickaxeIdInDist(final String dist) {
+        final File distRoot = new File(dist);
+        if (!distRoot.isDirectory()) {
+            return Optional.empty();
+        }
+        final File[] appDirs =
+                distRoot.listFiles(file ->
+                        file.isDirectory()
+                                && file.getName().startsWith(
+                                        PICKAXE_FOLDER_PREFIX));
+        if (appDirs == null) {
+            return Optional.empty();
+        }
+        for (final File appDir : appDirs) {
+            final File ymlFile =
+                    new File(
+                            appDir,
+                            "conf" + File.separator + PICKAXE_YML);
+            final Optional<String> pickaxeId = readPickaxeId(ymlFile);
+            if (pickaxeId.isPresent()) {
+                return pickaxeId;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Reads the {@code pickaxeId} field from the provided {@code pickaxe.yml}
+     * file.
+     *
+     * @param ymlFile The {@code pickaxe.yml} file to read.
+     *
+     * @return The pickaxe ID, if present and non-empty.
+     */
+    private static Optional<String> readPickaxeId(final File ymlFile) {
+        if (!ymlFile.isFile()) {
+            return Optional.empty();
+        }
+        try (InputStream in = new FileInputStream(ymlFile)) {
+            final Object parsed = new Yaml(new SafeConstructor()).load(in);
+            if (parsed instanceof Map) {
+                final Object value = ((Map<?, ?>) parsed).get("pickaxeId");
+                if (value != null) {
+                    final String pickaxeId = value.toString();
+                    if (!pickaxeId.isEmpty()) {
+                        return Optional.of(pickaxeId);
+                    }
+                }
+            }
+        } catch (final Exception e) {
+            LOG.warn("Failed to read pickaxe ID from {}", ymlFile, e);
+        }
+        return Optional.empty();
     }
 
     /**
